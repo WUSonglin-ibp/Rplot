@@ -1,0 +1,6 @@
+interface:
+  display_name: "Rplot"
+  short_description: "Nature-style R plotting scripts for A4 grid layouts."
+  default_prompt: "Use $rplot to create an editable R plotting script with A4 grid layout and Nature-style aesthetics."
+policy:
+  allow_implicit_invocation: true
