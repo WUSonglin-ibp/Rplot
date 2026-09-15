@@ -6,7 +6,9 @@ description: >-
   when the user asks for Rplot, R plotting code, A4 grid figure layout, or
   Nature-style R figures that should follow the
   user's local R script style: file paths built with file.path/os.path.join-like
-  components, grid viewports starting near the A4 top-left, black plot borders,
+  components, grid viewports starting near the A4 top-left, black left/bottom
+  axes with open top/right sides for ordinary scatter, bar, boxplot, and violin plots,
+  bar/column, boxplot, and violin panel widths calculated from visible X-axis ticks,
   6 pt ordinary text with a 5 pt hard floor, 10 pt uppercase regular Arial panel
   letters, restrained Nature-style palettes, clean legends, and base-R
   grDevices::pdf()-first output without Cairo.
@@ -28,6 +30,13 @@ Nature/high-impact journal style.
   plotting script and pass it to every theme, text geom, grid text grob, and PDF
   device. Do not silently substitute generic `"sans"`, Helvetica, Liberation
   Sans, DejaVu Sans, or another family.
+- Render **all figure text in black**. This includes titles, panel letters, axis
+  titles, tick labels, legends, direct labels, numeric labels, sample-size text,
+  statistical annotations, and explanatory notes. Never reuse a category,
+  condition, or method colour for text; reserve colour for non-text graphical
+  elements such as points, lines, bars, ribbons, and filled regions. Set
+  `colour = "black"` or `col = "black"` explicitly for every text-producing
+  theme element, geom, annotation, and grid grob.
 - For ordinary PDF output, register base R's built-in `ArialMT` Type 1 definition
   under the editable family name `Arial` before opening the device. Require
   `"ArialMT" %in% names(grDevices::pdfFonts())`; copy that definition, set its
@@ -61,6 +70,9 @@ Nature/high-impact journal style.
   `os.path.join`; avoid hard-coded `/`, `\\`, drive-specific separators, and `setwd()`.
 - Keep editable variables near the top: `project_dir`, `input_dir`, `output_dir`,
   input filenames, output prefix, A4 width/height, panel sizes,
+  `categorical_base_width_cm <- 2.0`, `categorical_per_x_tick_cm <- 0.5`,
+  `categorical_geom_width <- 0.5` for bar/column, boxplot, and violin geoms,
+  and the final `discrete_x_tick_count` used by bar/column, boxplot, and violin figures,
   `ordinary_text_size_pt <- 6`, `minimum_text_size_pt <- 5`, and
   `panel_label_size_pt <- 10`. Also derive the millimetre values required by
   ggplot2 text geoms from these point-size variables; do not hard-code them.
@@ -68,17 +80,16 @@ Nature/high-impact journal style.
   scatter plots. Treat it as an absolute ggplot2 millimetre value rather than a
   multiplier or a value derived from an earlier point size. Change it only when
   the user explicitly requests a different point size.
-- Use **4.5 cm** as the default height for every ordinary plot panel. Keep every
-  ordinary plot panel at or below **8 cm wide by 5 cm high** and every pie or
-  donut chart panel square and at or below **4 cm by 4 cm** by default. Exceed
-  these limits only when the user explicitly requests
-  a larger panel; data density alone is not sufficient. Resolve dense content
-  by shortening or wrapping labels, rotating or staggering X-axis labels,
+- Use **4.0 cm** as the default height for every ordinary plot panel. For plots
+  other than the discrete-X bar/column, boxplot, and violin cases defined below,
+  keep the panel at or below **8 cm wide by 5 cm high**. Keep every pie or donut
+  chart panel square and at or below **4 cm by 4 cm** by default. Resolve dense
+  content by shortening or wrapping labels, rotating or staggering X-axis labels,
   faceting, or using additional compact panels on the A4 page.
 - For **scatter plots and line plots whose X and Y axes are both scaled to the
   0-1 range**, use a square plotting panel by default: panel width must equal
-  panel height, and the side length should ordinarily be no greater than **4.5
-  cm**. Define an editable variable such as `unit_square_panel_cm <- 4.5`, use
+  panel height, and the side length should ordinarily be no greater than **4.0
+  cm**. Define an editable variable such as `unit_square_panel_cm <- 4.0`, use
   it for both the grid viewport width and height, and use a 1:1 coordinate ratio
   such as `coord_fixed(ratio = 1, xlim = c(0, 1), ylim = c(0, 1), expand = FALSE)`
   when the full theoretical range is appropriate. Legends, annotations, or
@@ -86,10 +97,47 @@ Nature/high-impact journal style.
   data panel into a rectangle. Deviate only when the user explicitly requests
   a rectangular panel or the axes do not genuinely share a comparable 0-1
   scale.
+- Whenever either continuous axis represents a fraction on a 0-1 scale or the
+  equivalent percentage on a 0-100% scale, divide the complete range into five
+  equal tick intervals. Use **0.2** for fractions (`seq(0, 1, by = 0.2)`), giving
+  `0, 0.2, 0.4, 0.6, 0.8, 1.0`; use **20 percentage points** for percentages
+  (`seq(0, 100, by = 20)`), giving `0, 20, 40, 60, 80, 100`. Apply this
+  independently to X and Y, including figures where only one axis uses such a
+  scale. If the plotting range extends to 1.1 or 110% for headroom, keep the
+  visible ticks ending at 1.0 or 100%. Do not use 0.25 or 25-percentage-point
+  tick intervals unless the user explicitly requests them.
+- For ordinary scatter plots, bar/column charts, boxplots, and violin plots,
+  use an open-axis frame by default: draw the bottom and left axes in black,
+  set `panel.border = element_blank()`, and leave the top and right frame lines
+  absent. Apply the same rule to ordinary combinations of these geoms, such as
+  violin-plus-boxplot or scatter-plus-smoother figures. Draw the top and right
+  frame lines only when the user explicitly requests a full frame or those
+  specific borders.
+- For bar/column charts, boxplots, and violin plots with a discrete X-axis,
+  calculate the plot-panel width as
+  `2.0 cm + 0.5 cm * discrete_x_tick_count`. Here,
+  `discrete_x_tick_count` means the number of X-axis tick labels actually
+  displayed after filtering, dropping unused factor levels, and applying any
+  explicit scale limits or breaks. For grouped or stacked bars, count X-axis
+  ticks rather than individual rectangles, fill groups, or stacked segments.
+  Apply the same formula to combined violin-plus-boxplot panels. Define
+  `categorical_base_width_cm <- 2.0` and
+  `categorical_per_x_tick_cm <- 0.5`, then derive `panel_width_cm` from those
+  variables; do not round the result or cap it at 8 cm. This formula describes
+  the plot-panel viewport only: external legends and annotations require
+  separately allocated width. If the computed width does not fit the current
+  A4 arrangement, preserve the formula and reflow panels, use A4 landscape,
+  facet, or continue on another A4 page.
+- For bar/column charts, boxplots, and violin plots on a discrete X-axis, use
+  `categorical_geom_width <- 0.5` as the shared default geom width. Pass it as
+  `width = categorical_geom_width` to `geom_col()`, `geom_bar()`,
+  `geom_boxplot()`, and `geom_violin()`. The value is a fraction of the spacing
+  between adjacent discrete X positions, not centimetres. Change it only when
+  the user explicitly requests another geom width.
 - For compact bar plots, define `axis_panel_line_width <- 0.25`,
   `bar_border_colour <- NA`, and `bar_border_line_width <- 0` near the other
-  plot settings. Use `axis_panel_line_width` for panel borders, axis lines, and
-  ticks. By default, bars should have no outlines or segment borders. Only use
+  plot settings. Use `axis_panel_line_width` for the visible left/bottom axes
+  and ticks. By default, bars should have no outlines or segment borders. Only use
   a bar outline such as `bar_border_line_width <- 0.1` when the user explicitly
   asks for bar borders.
 - Draw bar and column charts vertically by default: map categories to the X-axis
@@ -155,13 +203,17 @@ Nature/high-impact journal style.
   bottom/right blank row/column so the figure starts near the top-left instead
   of being vertically centered. Do not add extra spacer rows between panel rows
   unless the figure specifically needs them.
-- Choose panel row heights and column widths within the default size limits from
+- Choose panel row heights and column widths within the applicable defaults from
   expected data density, especially number of categories, rotated labels,
-  legends, and heatmap rows. Reorganize the figure instead of enlarging a panel.
-- Keep ordinary panels compact. Prefer integer or half-integer dimensions such
-  as 4, 4.5, or 5 cm for height and 6, 7.5, or 8 cm for width. Keep pie and donut
-  chart panels square, preferably 4 cm by 4 cm. Keep 0-1-by-0-1 scatter and line
-  panels square as well, ordinarily no larger than 4.5 cm by 4.5 cm.
+  legends, and heatmap rows. Reorganize the figure instead of changing the
+  calculated width of a discrete-X bar/column, boxplot, or violin panel.
+- Keep ordinary panels compact. For ordinary panels other than discrete-X
+  bar/column charts, boxplots, and violin plots, prefer integer or half-integer
+  dimensions such as 4 or 5 cm for height and 6, 7.5, or 8 cm for width.
+  Use the exact X-tick formula for bar/column charts, boxplots, and violin plots,
+  which gives 0.5 cm increments. Keep pie and donut chart
+  panels square, preferably 4 cm by 4 cm. Keep 0-1-by-0-1 scatter and line panels
+  square as well, ordinarily no larger than 4.0 cm by 4.0 cm.
 - Use 6 pt for ordinary axis titles, tick labels, legends, strip text, annotations,
   and numeric labels. A 5 pt size is allowed only for genuinely dense in-panel
   annotations when 6 pt cannot fit after reasonable layout or label adjustments.
@@ -192,10 +244,12 @@ Nature/high-impact journal style.
 - For percentage or fraction-style y-axes, leave headroom by default. If the
   visible tick range is 0-100%, set the plotting range to about 0-110. If the
   visible tick range is 0-1, set the plotting range to about 0-1.1. Keep the
-  tick labels at clean values such as 0-100 or 0-1 so the panel does not look
-  cramped at the top.
-- For non-heatmap plots, force plot borders/axes to black. Do not leave ggplot's
-  default grey panel border.
+  displayed ticks at `0, 20, 40, 60, 80, 100` for percentages or
+  `0, 0.2, 0.4, 0.6, 0.8, 1.0` for fractions so the panel does not look cramped
+  at the top.
+- For non-heatmap plots, force every visible axis or requested frame line to
+  black. Ordinary scatter, bar/column, boxplot, and violin plots follow the
+  open-axis rule above; do not leave ggplot's default grey panel border.
 - Use neutral grey by default for every graphical element whose primary role is
   to show a statistical range or uncertainty interval, including 25th-to-75th
   percentile boxes, boxplot whiskers, error bars, confidence-interval or
@@ -208,6 +262,8 @@ Nature/high-impact journal style.
 - Place legends outside the plotting panel on its right by default, aligned with
   the panel top. Prefer a frameless, compact legend in a dedicated right-side
   area so it does not cover data or shrink the intended data-panel dimensions.
+  For bar/column charts, boxplots, and violin plots, this legend area is
+  additional to the width calculated from visible X-axis ticks.
   Put a legend inside the panel only when the user explicitly requests it.
   For compact discrete legends, use these physical dimensions by default unless
   the user explicitly specifies another convention: key width `0.28 cm`, key
@@ -235,7 +291,15 @@ legend_key_text_gap_pt <- legend_key_text_gap_cm * 72 / 2.54
 
 theme(
   panel.grid = element_blank(),
-  panel.border = element_rect(linewidth = axis_panel_line_width),
+  panel.border = element_blank(),
+  axis.line.x.bottom = element_line(
+    colour = "black", linewidth = axis_panel_line_width
+  ),
+  axis.line.y.left = element_line(
+    colour = "black", linewidth = axis_panel_line_width
+  ),
+  axis.line.x.top = element_blank(),
+  axis.line.y.right = element_blank(),
   axis.ticks = element_line(linewidth = axis_panel_line_width),
   axis.text = element_text(size = ordinary_text_size_pt, color = "black"),
   axis.title = element_text(size = ordinary_text_size_pt, color = "black"),
@@ -380,8 +444,14 @@ dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 input_file <- file.path(input_dir, "input.tsv")
 output_pdf <- file.path(output_dir, "figure.pdf")
-panel_width_cm <- 8
-panel_height_cm <- 4.5
+df <- read.csv(input_file, sep = "\t", header = TRUE, check.names = FALSE)
+categorical_base_width_cm <- 2.0
+categorical_per_x_tick_cm <- 0.5
+categorical_geom_width <- 0.5
+discrete_x_tick_count <- nlevels(droplevels(factor(df$group)))
+panel_width_cm <- categorical_base_width_cm +
+  categorical_per_x_tick_cm * discrete_x_tick_count
+panel_height_cm <- 4.0
 point_size_mm <- 1.0
 font_family <- "Arial"
 pdf_font_family <- "ArialMT"
@@ -402,6 +472,14 @@ legend_key_spacing_y_cm <- legend_entry_center_spacing_cm - legend_key_height_cm
 legend_key_text_gap_pt <- legend_key_text_gap_cm * 72 / 2.54
 
 stopifnot(
+  discrete_x_tick_count >= 1,
+  categorical_geom_width > 0,
+  categorical_geom_width <= 1,
+  abs(
+    panel_width_cm -
+      (categorical_base_width_cm +
+         categorical_per_x_tick_cm * discrete_x_tick_count)
+  ) < 1e-12,
   ordinary_text_size_pt >= minimum_text_size_pt,
   ordinary_geom_text_size_mm * ggplot2::.pt >= minimum_text_size_pt,
   minimum_geom_text_size_mm * ggplot2::.pt >= minimum_text_size_pt
@@ -417,14 +495,19 @@ do.call(
   setNames(list(pdf_font_definition), font_family)
 )
 
-df <- read.csv(input_file, sep = "\t", header = TRUE, check.names = FALSE)
-
 theme_rplot <- function(base_size = ordinary_text_size_pt, base_family = font_family) {
   theme_bw(base_size = base_size, base_family = base_family) +
     theme(
       panel.grid = element_blank(),
-      panel.border = element_rect(colour = "black", fill = NA, linewidth = axis_panel_line_width),
-      axis.line = element_line(colour = "black", linewidth = axis_panel_line_width),
+      panel.border = element_blank(),
+      axis.line.x.bottom = element_line(
+        colour = "black", linewidth = axis_panel_line_width
+      ),
+      axis.line.y.left = element_line(
+        colour = "black", linewidth = axis_panel_line_width
+      ),
+      axis.line.x.top = element_blank(),
+      axis.line.y.right = element_blank(),
       axis.ticks = element_line(colour = "black", linewidth = axis_panel_line_width),
       axis.ticks.length = unit(0.08, "cm"),
       axis.text = element_text(size = base_size, colour = "black"),
@@ -454,7 +537,7 @@ theme_rplot <- function(base_size = ordinary_text_size_pt, base_family = font_fa
 }
 
 p <- ggplot(df, aes(x = group, y = value)) +
-  geom_col(width = 0.55, fill = "#0F4D92", colour = bar_border_colour, linewidth = bar_border_line_width) +
+  geom_col(width = categorical_geom_width, fill = "#0F4D92", colour = bar_border_colour, linewidth = bar_border_line_width) +
   labs(x = "", y = "Value") +
   theme_rplot()
 
@@ -479,7 +562,7 @@ pushViewport(viewport(
 main_layout <- grid.layout(
   nrow = 4,
   ncol = 2,
-  heights = unit(c(panel_height_cm, 4.5, 4.5, 4.5), "cm"),
+  heights = unit(c(panel_height_cm, 4.0, 4.0, 4.0), "cm"),
   widths = unit(c(panel_width_cm, 5), "cm")
 )
 pushViewport(viewport(layout = main_layout))
@@ -520,23 +603,29 @@ the comment block and command body.
 
 ## Layout Heuristics
 
-- One ordinary compact plot: use 4.5 cm height by default and allocate 6-8 cm
-  width; do not exceed 8 cm by 5 cm unless the user explicitly requests a
-  larger panel.
+- One discrete-X bar/column chart, boxplot, or violin plot: use 4.0 cm height
+  and width `2.0 cm + 0.5 cm * visible X-axis tick count`; do not cap the
+  result at 8 cm.
+- Bar/column, boxplot, and violin geoms use `width = 0.5` by default, measured
+  relative to the spacing between adjacent discrete X positions.
+- One other ordinary compact plot: use 4.0 cm height by default and allocate
+  6-8 cm width; do not exceed 8 cm by 5 cm unless the user explicitly requests
+  a larger panel.
 - One pie or donut chart: use a square panel no larger than 4 cm by 4 cm.
 - One scatter or line plot with both axes on comparable 0-1 scales: use a square
-  panel, normally 4.5 cm by 4.5 cm or smaller, and preserve a 1:1 data-coordinate
+  panel, normally 4.0 cm by 4.0 cm or smaller, and preserve a 1:1 data-coordinate
   ratio when showing the full 0-1 range.
-- Use integer or 0.5 cm steps for plot and spacer dimensions whenever possible.
-- Many categories or long labels: stay within 8 cm by 5 cm and prefer wrapping,
-  abbreviations, rotating or staggering X-axis labels, faceting, or multiple
-  compact panels. Keep bars vertical unless the user explicitly requests a
-  horizontal orientation.
+- Use integer or 0.5 cm steps for plot and spacer dimensions whenever possible;
+  the exact bar/box/violin width formula produces 0.5 cm increments.
+- Many categories or long labels: preserve the bar/box/violin X-tick width
+  formula and prefer wrapping, abbreviations, rotating or staggering X-axis
+  labels, faceting, reflowing the layout, A4 landscape, or additional A4 pages.
+  Keep bars vertical unless the user explicitly requests a horizontal orientation.
 - Dense scatter with a legend: keep the plot panel within 8 cm by 5 cm and
   allocate a compact, top-aligned legend area immediately to its right on the
   A4 page. If
-  both axes are 0-1 scales, the data panel remains square and no larger than 4.5
-  cm by 4.5 cm; the external legend must not stretch that square.
+  both axes are 0-1 scales, the data panel remains square and no larger than 4.0
+  cm by 4.0 cm; the external legend must not stretch that square.
 - Multi-row A4 pages: define all row heights explicitly in cm; leave unused cells blank
   rather than stretching plots to fill the page.
 - Place an external legend in a top-aligned grid area immediately to the right
@@ -556,6 +645,9 @@ the comment block and command body.
   the user gives a plot/image size. Interpret ordinary image-size requests as
   panel dimensions within the A4 layout unless they explicitly name a non-A4
   output page/canvas/layout.
+- When a bar/box/violin panel calculated from visible X-axis ticks cannot fit the
+  current A4 arrangement, preserve its computed width and first reflow panels;
+  then use A4 landscape, facets, or additional A4 pages as needed.
 - Always generate a `commands.sh` entrypoint next to the `.R` script and make it
   executable when working in the filesystem.
 - Only when the user explicitly asks for extra editable or raster output, add
@@ -587,6 +679,25 @@ When editing or creating an actual script, prefer these checks:
   minimum verify that it contains the correct `cd` path and `Rscript` command.
 - Inspect every modified R script and reject `cairo_pdf`, `CairoPDF`,
   `device = cairo_pdf`, `png(type = "cairo")`, and other Cairo selectors.
+- Inspect every text-producing theme element, geom, annotation, and grid grob;
+  require its visible text colour to be black. Reject category-, condition-, or
+  method-coloured text even when the matching graphical marks use those colours.
+- For ordinary scatter, bar/column, boxplot, and violin figures, verify that the
+  top and right frame lines are absent unless the user explicitly requested them.
+- For every continuous X or Y axis representing 0-1 fractions or 0-100%
+  percentages, verify that its default breaks are respectively
+  `seq(0, 1, by = 0.2)` or `seq(0, 100, by = 20)`. Confirm that 0.25 or
+  25-percentage-point intervals are absent unless the user explicitly requested
+  them.
+- For each discrete-X bar/column, boxplot, or violin panel, count the final
+  visible X-axis ticks after filtering and explicit scale breaks, then verify
+  that its viewport width equals
+  `2.0 cm + 0.5 cm * discrete_x_tick_count`. Do not apply the general 8 cm
+  width cap to these panels.
+- Verify that every discrete-X `geom_col()`, `geom_bar()`, `geom_boxplot()`, and
+  `geom_violin()` uses `width = categorical_geom_width` with the default value
+  `categorical_geom_width <- 0.5`, unless the user explicitly requested another
+  geom width.
 - Confirm that each PDF is opened with `grDevices::pdf(file = ..., family = font_family)`.
 - Run `pdfinfo` and require an R producer rather than a Cairo producer. Run
   `pdffonts` and require `ArialMT`/`Arial-BoldMT` without unintended font
